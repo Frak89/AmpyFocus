@@ -39,6 +39,11 @@ public final class EditionPolicy implements FocusPolicy {
         request.putString("request_id", UUID.randomUUID().toString());
         request.putBoolean("family_dns", FocusStore.prefs(context).getBoolean("family_dns_enabled", false));
         request.putBoolean("silent_mode", FocusStore.prefs(context).getBoolean("silence_enabled", false));
+        request.putBoolean("metered_enabled", FocusStore.prefs(context).getBoolean("metered_enabled", false));
+        request.putStringArrayList("metered_packages", new ArrayList<>(
+                FocusStore.prefs(context).getStringSet("metered_packages", java.util.Collections.emptySet())));
+        request.putStringArrayList("blocked_domains", new ArrayList<>(
+                DomainRules.parse(FocusStore.prefs(context).getString("custom_domains", ""))));
         request.putBoolean("location_enabled", FocusStore.geoEnabled(context));
         request.putInt("location_mode", FocusStore.geoMode(context));
         request.putInt("location_radius_m", FocusStore.geoRadius(context));

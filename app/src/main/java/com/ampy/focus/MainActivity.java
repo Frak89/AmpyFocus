@@ -41,6 +41,8 @@ public final class MainActivity extends Activity {
     private LinearLayout column;
     private TextView countdown;
     private static final int GEO_PERMISSION_REQUEST = 505;
+    private static final int AUDIO_WAV_REQUEST = 507;
+    private int pendingExportColor = AudioSynthesis.BROWN;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean noisePlaying = false;
 
@@ -161,8 +163,10 @@ public final class MainActivity extends Activity {
             addLabel("APP ESSENZIALI", 12, ACCENT, true, 22);
             showEssentialTiles();
             addButton("Tutte le app consentite", false, () -> showLauncher());
-            addButton(noisePlaying ? "Ferma Brown Noise" : "Ascolta Brown Noise", false,
+            addButton(noisePlaying ? "Ferma suoni" : "Ascolta Brown Noise", false,
                     () -> toggleNoise());
+            addButton("Suono White / Pink / Brown", false, () -> chooseSound());
+            addButton("Esporta WAV 24-bit / 48 kHz (60 secondi)", false, () -> chooseWavExport());
             addButton("Chiama emergenza (112)", false, () -> callEmergency());
 
             Button finish = new Button(this);
@@ -241,6 +245,9 @@ public final class MainActivity extends Activity {
         addButton("Configura zona GPS / rete mobile", false, () -> configureGeo());
         addLabel(GeoFenceController.status(this), 12, MUTED, false, 8);
 
+        addLabel("AUDIO OFFLINE", 12, ACCENT, true, 28);
+        addButton("Suoni sintetizzati • White / Pink / Brown", false, () -> chooseSound());
+        addButton("Esporta WAV 24-bit / 48 kHz (60 secondi)", false, () -> chooseWavExport());
         addLabel("PIANIFICAZIONE", 12, ACCENT, true, 28);
         String schedule = pretty(FocusStore.startMinute(this)) + " – " + pretty(FocusStore.endMinute(this));
         addButton("Imposta orari  •  " + schedule, false, () -> pickStart());
@@ -356,7 +363,8 @@ public final class MainActivity extends Activity {
             noisePlaying = false;
         } else {
             try {
-                Intent audio = new Intent(this, BrownNoiseService.class);
+                Intent audio = new Intent(this, BrownNoiseService.class)
+                        .putExtra("color", BrownNoiseService.selectedColor);
                 if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(audio);
                 else startService(audio);
                 noisePlaying = true;
@@ -365,6 +373,67 @@ public final class MainActivity extends Activity {
             }
         }
         render();
+    }
+
+
+    private void chooseSound() {
+        String[] names = {"Brown noise", "Pink noise", "White noise", "Ferma riproduzione"};
+        new AlertDialog.Builder(this).setTitle("Suoni di concentrazione")
+            .setItems(names, (dialog, which) -> {
+                if (which == 3) {
+                    stopService(new Intent(this, BrownNoiseService.class));
+                    noisePlaying = false;
+                } else {
+                    BrownNoiseService.selectedColor = which;
+                    try {
+                        Intent audio = new Intent(this, BrownNoiseService.class)
+                                .putExtra("color", which);
+                        startForegroundService(audio);
+                        noisePlaying = true;
+                    } catch (RuntimeException e) {
+                        Toast.makeText(this, "Audio non avviabile.", Toast.LENGTH_LONG).show();
+                    }
+                }
+                render();
+            }).show();
+    }
+
+    private void chooseWavExport() {
+        final String[] names = {"Brown Noise", "Pink Noise", "White Noise"};
+        new AlertDialog.Builder(this).setTitle("Esporta una traccia WAV")
+            .setItems(names, (dialog, which) -> {
+                pendingExportColor = which;
+                Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                create.addCategory(Intent.CATEGORY_OPENABLE);
+                create.setType("audio/wav");
+                create.putExtra(Intent.EXTRA_TITLE, "AmpyFocus-" + names[which].replace(' ', '-')
+                        + "-48kHz-24bit.wav");
+                startActivityForResult(create, AUDIO_WAV_REQUEST);
+            }).show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != AUDIO_WAV_REQUEST || resultCode != RESULT_OK
+                || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        int color = pendingExportColor;
+        Toast.makeText(this, "Generazione WAV in corso…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            boolean succeeded = false;
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out != null) {
+                    WavExporter.write(out, color);
+                    succeeded = true;
+                }
+            } catch (java.io.IOException | RuntimeException ignored) { }
+            final boolean ok = succeeded;
+            runOnUiThread(() -> Toast.makeText(this,
+                    ok ? "WAV esportato: 48 kHz / PCM 24 bit, 60 s."
+                       : "Impossibile completare l'esportazione WAV.",
+                    Toast.LENGTH_LONG).show());
+        }, "AmpyFocus-WAV-export").start();
     }
 
     private void callEmergency() {

@@ -1,0 +1,11 @@
+// Place this directory into the AmpybiOS/AOSP source tree and add
+// AmpyFocusBridge to PRODUCT_PACKAGES in the device product configuration.
+// Android.bp is intentionally not used by the public Gradle APK builds.
+android_app {
+    name: "AmpyFocusBridge",
+    srcs: ["src/**/*.java"],
+    manifest: "AndroidManifest.xml",
+    platform_apis: true,
+    certificate: "platform",
+    privileged: true,
+}

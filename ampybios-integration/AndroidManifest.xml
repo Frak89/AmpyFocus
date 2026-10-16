@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.ampybios.focusbridge">
+    <uses-permission android:name="android.permission.SUSPEND_APPS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <permission android:name="com.ampybios.permission.MANAGE_FOCUS"
+        android:protectionLevel="signature" />
+    <application
+        android:label="AmpybiOS FocusBridge"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
+        <provider
+            android:name=".FocusBridgeProvider"
+            android:authorities="com.ampybios.focusbridge.policy"
+            android:permission="com.ampybios.permission.MANAGE_FOCUS"
+            android:grantUriPermissions="false"
+            android:exported="true" />
+        <receiver android:name=".FocusLeaseReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

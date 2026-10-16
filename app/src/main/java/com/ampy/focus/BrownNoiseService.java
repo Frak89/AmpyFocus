@@ -16,6 +16,7 @@ import java.util.Random;
 public final class BrownNoiseService extends Service {
     private static final String CHANNEL = "ampyfocus_audio";
     public static volatile boolean isPlaying;
+    public static volatile int selectedColor = AudioSynthesis.BROWN;
     private volatile boolean running;
     private Thread audioThread;
 
@@ -23,6 +24,10 @@ public final class BrownNoiseService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null) {
+            selectedColor = Math.max(AudioSynthesis.BROWN, Math.min(AudioSynthesis.WHITE,
+                    intent.getIntExtra("color", AudioSynthesis.BROWN)));
+        }
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         nm.createNotificationChannel(new NotificationChannel(
                 CHANNEL, "AmpyFocus Audio", NotificationManager.IMPORTANCE_LOW));
@@ -31,7 +36,7 @@ public final class BrownNoiseService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle("AmpyFocus · Brown Noise")
+                .setContentTitle("AmpyFocus · Focus Sound")
                 .setContentText("Audio offline per la concentrazione")
                 .setContentIntent(pi)
                 .setOngoing(true)
@@ -65,15 +70,12 @@ public final class BrownNoiseService extends Service {
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build();
             if (track.getState() != AudioTrack.STATE_INITIALIZED) return;
-            Random random = new Random();
+            AudioSynthesis synth = new AudioSynthesis(System.nanoTime());
             short[] pcm = new short[2048];
-            double brown = 0;
             track.play();
             while (running && !Thread.currentThread().isInterrupted()) {
                 for (int i = 0; i < pcm.length; i++) {
-                    brown = (brown + (random.nextDouble() * 2 - 1) * 0.015) * 0.998;
-                    brown = Math.max(-1.0, Math.min(1.0, brown));
-                    pcm[i] = (short) (brown * 4500.0);
+                    pcm[i] = (short) Math.round(synth.next(selectedColor) * 32767d);
                 }
                 if (track.write(pcm, 0, pcm.length) < 0) break;
             }

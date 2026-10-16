@@ -12,6 +12,7 @@ public final class FocusScheduler {
     private static final int END_ID = 102;
     private static final int MANUAL_ID = 103;
     private static final int QUOTA_ID = 104;
+    private static final int BRIDGE_HEARTBEAT_ID = 105;
     private FocusScheduler() {}
 
     public static void rearm(Context c) {
@@ -21,11 +22,17 @@ public final class FocusScheduler {
         cancel(alarm, c, END_ID);
         cancel(alarm, c, MANUAL_ID);
         cancel(alarm, c, QUOTA_ID);
+        cancel(alarm, c, BRIDGE_HEARTBEAT_ID);
 
         if (FocusStore.scheduleEnabled(c)
                 && FocusStore.startMinute(c) != FocusStore.endMinute(c)) {
             schedule(alarm, c, START_ID, nextTime(FocusStore.startMinute(c)));
             schedule(alarm, c, END_ID, nextTime(FocusStore.endMinute(c)));
+        }
+        if (FocusManager.isWanted(c)) {
+            // Keep the OS-owned 20-minute suspension lease alive in the Extreme edition.
+            schedule(alarm, c, BRIDGE_HEARTBEAT_ID,
+                    System.currentTimeMillis() + 10 * 60_000L);
         }
         if (FocusStore.prefs(c).getBoolean("quota_enabled", false)) {
             schedule(alarm, c, QUOTA_ID, System.currentTimeMillis() + 15 * 60_000L);

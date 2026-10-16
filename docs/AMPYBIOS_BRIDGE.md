@@ -1,49 +1,60 @@
-# AmpyFocus Extreme: privileged AmpybiOS bridge contract
+# AmpyFocus ↔ AmpybiOS FocusBridge v2
 
-**State: contract only; integration in the AmpybiOS OS source tree is a separate task.** No app install can silently grant this privilege.
+## Privilege boundary
 
-## Trust boundary
+App package: `com.ampy.focus.extreme`. Privileged provider authority:
+`content://com.ampybios.focusbridge.policy`. The **OS** defines and enforces
+`com.ampybios.permission.MANAGE_FOCUS` (signature protection, not dangerous).
 
-AmpybiOS must define a signature-only permission owned by the OS:
-`com.ampybios.permission.MANAGE_FOCUS`.
-It must be granted to the **system-image signed** AmpyFocus Extreme APK. A privileged
-system-owned provider exposes authority:
-`content://com.ampybios.focusbridge.policy`
+The Extreme app and provider must both be **signed with the authorized AmpybiOS
+platform certificate**, installed in the OS image, and tested with AOSP build policies.
+Installing an ordinary debug APK does not grant the permission.
 
-Provider must require the signature permission for **read and write**, verify
-calling UID/signature, reject cross-user requests, keep an independent watchdog
-and always preserve emergency calls, clock alarms, device unlock and recovery.
+## Provider IPC
 
-## Provider call protocol v1
+`ContentResolver.call(uri, "set_focus", null, bundle)`
 
-Client: `ContentResolver.call(uri, "set_focus", null, extras)`
+Input:
+- `protocol`: 2
+- `active`: Boolean
+- `blocked_packages`: array of package names
+- `blocked_domains`: array of validated hostname/suffix patterns
+- `family_dns`: Boolean
+- `silent_mode`: Boolean
+- `metered_enabled`: Boolean
+- `metered_packages`: array of package names
+- `location_enabled`: Boolean
+- `location_mode`: 0/1 inside/2 outside
+- `location_radius_m`: 50–50000
+- `location_lat`, `location_lon`: double when configured
+- `daily_quota_enabled`, `daily_quota_min`
+- `request_id`: audit correlation ID
 
-Input Bundle:
-- `protocol`: integer = `1`
-- `active`: boolean
-- `blocked_packages`: StringArrayList; user-consented targets only
-- `request_id`: String (unique audit correlation)
+Output:
+- `applied`: Boolean (true only when **all requested OS-level policies** are truly applied)
+- `reason`: human-readable failure/success
 
-Output Bundle:
-- `applied`: boolean — true ONLY after policy is actually enforced or safely removed
-- `reason`: String — actionable error when not applied
+The included OS provider **currently enforces package suspension only** using
+`PackageManager.setPackagesSuspended` with platform permission `SUSPEND_APPS`.
+It rejects unsupported DNS, metered or custom-domain policies rather than
+pretending the entire request was fulfilled. The client handles DND and Android
+geo/usage state separately; the provider is **not yet independent geofence enforcement**.
 
-No silent success: unrecognized protocols must return false. Policy service
-must persist its own applied-package snapshot, restore policies on expiry,
-crash and recovery, and check an independent OS-owned expiration schedule.
-The Android app is not allowed to kill arbitrary processes itself.
+## Recovery requirements
 
-An Extreme APK built from this repo will show **Bridge non disponibile** on
-stock Android; this is intentional. Before shipping, implement and test the
-provider in the real AmpybiOS tree, configure signature allowlists, adopt
-protected framework hooks for any desired global firewall, and automate tests
-for fail-safe recovery.
+- Each successful suspension has a 20-minute OS-owned lease.
+- The app renews policy every 10 minutes through alarms; Android power policy
+  can delay alarms, so leases can expire rather than trap the device.
+- The OS attempts to unsuspend managed packages when lease expires and on boot.
+- The OS provider cannot suspend the phone, system UI, installer, settings, critical
+  permission components or the AmpyFocus clients.
+- If `applied=false`, the UI must not claim full protection.
+- No system process killer is implemented. Do not turn off Android's core services.
 
-## Required pre-release tests
+## To complete Extreme
 
-1. Starting/ending session suspends/restores exactly the consented targets.
-2. Reboot during focus, crash mid-policy, device-owner removal, OTA and clock change.
-3. Emergency dialing, alarms, telephony, permissions, settings needed for repair.
-4. Child/multi-user separation; provider caller authentication; audit-log privacy.
-5. Network restrictions, DNS-over-HTTPS, VPN, captive portal and app-bound webviews
-   only after separate audited network-policy code is actually implemented.
+Implement a tested OS-owned network-policy service (per-UID allowed traffic,
+DNS/DoH/VPN bypass policies, block lists for pornography/dating/content), and
+wire it to FocusBridge with transactional rollback; add unit/integration/device
+tests for permission bypasses, profile boundaries, SELinux, battery, OTA and
+failsafe recovery. App alone cannot enforce those system capabilities.

@@ -61,6 +61,7 @@ public final class FocusManager {
         SilenceController.apply(context, wanted
                 && p.getBoolean("silence_enabled", false));
         FamilyDnsController.update(context, wanted);
+        CellDataController.update(context, wanted);
         Set<String> packages = new HashSet<>(UsageQuota.expired(context));
         if (wanted) packages.addAll(FocusStore.blocked(context));
         boolean mustApply = wanted || !packages.isEmpty();
