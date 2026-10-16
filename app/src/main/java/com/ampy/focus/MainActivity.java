@@ -3,6 +3,12 @@ package com.ampy.focus;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationManager;
+import android.provider.Settings;
+import android.text.InputType;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -34,6 +40,7 @@ public final class MainActivity extends Activity {
     private static final int ACCENT = Color.rgb(120, 224, 206);
     private LinearLayout column;
     private TextView countdown;
+    private static final int GEO_PERMISSION_REQUEST = 505;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean noisePlaying = false;
 
@@ -41,7 +48,10 @@ public final class MainActivity extends Activity {
         @Override public void run() {
             if (countdown != null) {
                 long remaining = FocusManager.expectedEndMillis(MainActivity.this) - System.currentTimeMillis();
-                if (remaining <= 0) {
+                if (GeoFenceController.shouldTrigger(MainActivity.this)
+                        && FocusManager.manualUntil(MainActivity.this) <= System.currentTimeMillis()) {
+                    countdown.setText("ZONA FOCUS");
+                } else if (remaining <= 0) {
                     FocusManager.refresh(MainActivity.this);
                     FocusScheduler.rearm(MainActivity.this);
                     render();
@@ -64,6 +74,8 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        GeoFenceController.refreshLastKnown(this);
+        GeoFenceController.register(this);
         FocusManager.refresh(this);
         FocusScheduler.rearm(this);
         noisePlaying = BrownNoiseService.isPlaying;
@@ -141,10 +153,14 @@ public final class MainActivity extends Activity {
             timerLp.topMargin = dp(30);
             column.addView(countdown, timerLp);
             long remaining = FocusManager.expectedEndMillis(this) - System.currentTimeMillis();
-            countdown.setText(remaining > 0 ? duration(remaining) : "--:--:--");
+            countdown.setText(GeoFenceController.shouldTrigger(this)
+                && FocusManager.manualUntil(this) <= System.currentTimeMillis()
+                ? "ZONA FOCUS" : remaining > 0 ? duration(remaining) : "--:--:--");
             addLabel(FocusStore.goal(this), 22, TEXT, true, 35);
             addLabel(FocusManager.lastMessage(this), 12, MUTED, false, 20);
-            addButton("App consentite", false, () -> showLauncher());
+            addLabel("APP ESSENZIALI", 12, ACCENT, true, 22);
+            showEssentialTiles();
+            addButton("Tutte le app consentite", false, () -> showLauncher());
             addButton(noisePlaying ? "Ferma Brown Noise" : "Ascolta Brown Noise", false,
                     () -> toggleNoise());
             addButton("Chiama emergenza (112)", false, () -> callEmergency());
@@ -183,7 +199,39 @@ public final class MainActivity extends Activity {
         addLabel("RESTRIZIONI", 12, ACCENT, true, 28);
         addButton("Scegli app da bloccare (" + FocusStore.blocked(this).size() + ")",
                 false, () -> chooseBlocked());
-        addButton("Apri un'app", false, () -> showLauncher());
+        addButton("Launcher essenziale", false, () -> showLauncher());
+        addButton("Imposta come schermata Home", false, () -> {
+            try { startActivity(new Intent(Settings.ACTION_HOME_SETTINGS)); }
+            catch (RuntimeException e) {
+                Toast.makeText(this, "Seleziona il launcher nelle impostazioni Android.", Toast.LENGTH_LONG).show();
+            }
+        });
+        addButton(FocusStore.prefs(this).getBoolean("quota_enabled", false)
+                ? "Disattiva limite app quotidiano" : "Attiva limite app quotidiano", false,
+                () -> toggleQuota());
+        addButton("Minuti giornalieri per app  •  "
+                + FocusStore.prefs(this).getInt("quota_minutes", 15),
+                false, () -> configureQuota());
+        addButton(UsageQuota.hasAccess(this) ? "Accesso statistiche: concesso"
+                : "Autorizza accesso alle statistiche delle app", false,
+                () -> startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)));
+        addLabel("AMBIENTE E RETE", 12, ACCENT, true, 28);
+        addButton(FocusStore.prefs(this).getBoolean("silence_enabled", false)
+                ? "Modalità silenziosa: SÌ" : "Modalità silenziosa: NO", false,
+                () -> toggleSilence());
+        addButton(SilenceController.hasAccess(this) ? "Permesso Non disturbare: OK"
+                : "Autorizza Non disturbare", false, () ->
+                startActivity(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)));
+        addButton(FocusStore.prefs(this).getBoolean("family_dns_enabled", false)
+                ? "Filtro DNS famiglia: SÌ" : "Filtro DNS famiglia: NO", false,
+                () -> toggleFamilyDns());
+        addLabel(FocusStore.prefs(this).getString("family_dns_status",
+                "Filtro opzionale Cloudflare Family (siti adulti/malware, non completo)."),
+                12, MUTED, false, 8);
+        addButton("Siti personalizzati (Extreme AmpybiOS)", false, () -> editDomains());
+        addLabel("BLOCCO PER LOCALITÀ", 12, ACCENT, true, 28);
+        addButton("Configura zona GPS / rete mobile", false, () -> configureGeo());
+        addLabel(GeoFenceController.status(this), 12, MUTED, false, 8);
 
         addLabel("PIANIFICAZIONE", 12, ACCENT, true, 28);
         String schedule = pretty(FocusStore.startMinute(this)) + " – " + pretty(FocusStore.endMinute(this));
@@ -199,7 +247,7 @@ public final class MainActivity extends Activity {
 
         addLabel("STATO DEL MOTORE", 12, ACCENT, true, 28);
         addLabel(EditionPolicy.create().availabilityMessage(this), 13, MUTED, false, 12);
-        addLabel("Anteprima 0.1: blocco app selezionate; filtro web, processi e quote per-app in sviluppo.",
+        addLabel("v0.2: quote app approssimative (fino a 15 min di ritardo), DNS Family opzionale; GPS/rete dipende dai permessi e dalla precisione. Extreme richiede un bridge firmato.",
                 12, MUTED, false, 20);
     }
 
@@ -317,6 +365,246 @@ public final class MainActivity extends Activity {
         } catch (RuntimeException e) {
             Toast.makeText(this, "Apri il dialer di emergenza del dispositivo.", Toast.LENGTH_LONG).show();
         }
+    }
+
+
+    /** Essential launcher icons intentionally include phone, clock and a few user-permitted apps. */
+    private void showEssentialTiles() {
+        addButton("Telefono · chiamate", false, () -> {
+            try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:"))); }
+            catch (RuntimeException e) { callEmergency(); }
+        });
+        addButton("Sveglia / orologio", false, () -> {
+            try {
+                startActivity(new Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS));
+            } catch (RuntimeException e) {
+                Toast.makeText(this, "App orologio non disponibile.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        int count = 0;
+        for (FocusPackageCatalog.Entry entry : FocusPackageCatalog.list(this)) {
+            if (FocusStore.blocked(this).contains(entry.pkg)) continue;
+            if (count++ >= 3) break;
+            addButton(entry.label, false, () -> {
+                Intent launch = getPackageManager().getLaunchIntentForPackage(entry.pkg);
+                if (launch != null) {
+                    try { startActivity(launch); }
+                    catch (RuntimeException e) {
+                        Toast.makeText(this, "App non avviabile.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+    }
+
+    private void toggleQuota() {
+        if (!UsageQuota.hasAccess(this)) {
+            new AlertDialog.Builder(this).setTitle("Permesso utilizzo app")
+                .setMessage("Per calcolare il consumo giornaliero serve il permesso 'Accesso ai dati di utilizzo'. Le statistiche rimangono locali; il controllo non è al secondo.")
+                .setNegativeButton("Annulla", null)
+                .setPositiveButton("Apri impostazioni", (d, n) ->
+                    startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))).show();
+            return;
+        }
+        boolean old = FocusStore.prefs(this).getBoolean("quota_enabled", false);
+        FocusStore.prefs(this).edit().putBoolean("quota_enabled", !old).apply();
+        FocusManager.refresh(this);
+        FocusScheduler.rearm(this);
+        render();
+    }
+
+    private void configureQuota() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(FocusStore.prefs(this).getInt("quota_minutes", 15)));
+        new AlertDialog.Builder(this).setTitle("Minuti massimi per ogni app scelta")
+            .setMessage("Da 1 a 240 minuti al giorno; blocco approssimativo verificato periodicamente. Le app selezionate vengono comunque bloccate subito durante Focus.")
+            .setView(input).setNegativeButton("Annulla", null)
+            .setPositiveButton("Salva", (d, n) -> {
+                try {
+                    int minutes = Integer.parseInt(input.getText().toString().trim());
+                    if (minutes < 1 || minutes > 240) throw new NumberFormatException();
+                    FocusStore.prefs(this).edit().putInt("quota_minutes", minutes).apply();
+                    FocusManager.refresh(this);
+                    FocusScheduler.rearm(this);
+                    render();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "Inserisci 1–240 minuti.", Toast.LENGTH_LONG).show();
+                }
+            }).show();
+    }
+
+    private void toggleSilence() {
+        if (!SilenceController.hasAccess(this)) {
+            startActivity(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS));
+            return;
+        }
+        boolean old = FocusStore.prefs(this).getBoolean("silence_enabled", false);
+        FocusStore.prefs(this).edit().putBoolean("silence_enabled", !old).apply();
+        FocusManager.refresh(this);
+        render();
+    }
+
+    private void toggleFamilyDns() {
+        boolean active = FocusStore.prefs(this).getBoolean("family_dns_enabled", false);
+        if (active) {
+            FocusStore.prefs(this).edit().putBoolean("family_dns_enabled", false).apply();
+            FocusManager.refresh(this);
+            render();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Filtro DNS famiglia (facoltativo)")
+            .setMessage("Durante Focus utilizza Cloudflare Family via DNS-over-TLS. Cloudflare riceve le richieste DNS. Non blocca necessariamente app, DNS integrati, VPN o tutte le immagini esplicite. Nella variante Extreme è richiesta un'integrazione AmpybiOS. Continuare?")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Attiva", (d, n) -> {
+                FocusStore.prefs(this).edit().putBoolean("family_dns_enabled", true).apply();
+                FocusManager.refresh(this);
+                render();
+            }).show();
+    }
+
+    private void editDomains() {
+        EditText domains = new EditText(this);
+        domains.setMinLines(3);
+        domains.setText(FocusStore.prefs(this).getString("custom_domains", ""));
+        new AlertDialog.Builder(this).setTitle("Domini da bloccare: Extreme")
+            .setMessage("Uno per riga o separati da virgola. Questi domini verranno inviati al FocusBridge AmpybiOS v2: NON sono filtrati dall'edizione Device Owner.")
+            .setView(domains).setNegativeButton("Annulla", null)
+            .setPositiveButton("Salva", (d, n) -> {
+                Set<String> normalized = DomainRules.parse(domains.getText().toString());
+                String saved = android.text.TextUtils.join("\\n", normalized);
+                FocusStore.prefs(this).edit().putString("custom_domains", saved).apply();
+                FocusManager.refresh(this);
+                render();
+            }).show();
+    }
+
+    private void configureGeo() {
+        final String[] options = {
+            "Usa posizione corrente come centro",
+            "Raggio in metri",
+            "Raggio in chilometri",
+            "Attiva blocco DENTRO la zona",
+            "Attiva blocco FUORI dalla zona",
+            "Spegni geofence",
+            "Concedi posizione in background",
+            "Elimina coordinate salvate"
+        };
+        new AlertDialog.Builder(this).setTitle("GPS + localizzazione rete cellulare / Wi-Fi")
+                .setMessage("La posizione di rete è stimata: con raggi piccoli potrebbe essere imprecisa. Quando la posizione è incerta o scaduta il solo geofence non blocca nulla.")
+                .setItems(options, (d, which) -> {
+                    switch (which) {
+                        case 0: captureGeoCenter(); break;
+                        case 1: configureRadius(false); break;
+                        case 2: configureRadius(true); break;
+                        case 3:
+                        case 4:
+                            if (!FocusStore.prefs(this).getBoolean("geo_center_configured", false)) {
+                                Toast.makeText(this, "Prima salva il centro della zona.", Toast.LENGTH_LONG).show();
+                                captureGeoCenter();
+                                return;
+                            }
+                            if (!GeoFenceController.hasForegroundPermission(this)) {
+                                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION}, GEO_PERMISSION_REQUEST);
+                                return;
+                            }
+                            if (!GeoFenceController.hasBackgroundPermission(this)) {
+                                Toast.makeText(this, "Concedi 'Consenti sempre' nelle impostazioni dell'app.",
+                                        Toast.LENGTH_LONG).show();
+                                showLocationAppSettings();
+                                return;
+                            }
+                            FocusStore.prefs(this).edit().putBoolean("geo_enabled", true)
+                                    .putInt("geo_mode", which == 3 ? 1 : 2).apply();
+                            GeoFenceController.register(this);
+                            FocusManager.refresh(this);
+                            render();
+                            break;
+                        case 5:
+                            FocusStore.prefs(this).edit().putBoolean("geo_enabled", false).apply();
+                            GeoFenceController.register(this);
+                            FocusManager.refresh(this);
+                            render();
+                            break;
+                        case 6: showLocationAppSettings(); break;
+                        case 7:
+                            FocusStore.clearGeo(this);
+                            GeoFenceController.register(this);
+                            FocusManager.refresh(this);
+                            render();
+                            break;
+                        default: break;
+                    }
+                }).show();
+    }
+
+    private void configureRadius(boolean kilometers) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setText(kilometers
+                ? String.valueOf(FocusStore.geoRadius(this) / 1000d)
+                : String.valueOf(FocusStore.geoRadius(this)));
+        new AlertDialog.Builder(this).setTitle(kilometers ? "Raggio (km)" : "Raggio (metri)")
+            .setMessage("Distanza ammessa: da 50 metri a 50 km. La precisione GPS/rete deve essere sufficiente per una decisione affidabile.")
+            .setView(input).setNegativeButton("Annulla", null)
+            .setPositiveButton("Salva", (d, n) -> {
+                try {
+                    double amount = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+                    double meters = kilometers ? amount * 1000d : amount;
+                    if (!Double.isFinite(meters) || meters < 50 || meters > 50000) throw new NumberFormatException();
+                    FocusStore.prefs(this).edit().putInt("geo_radius_m", (int) Math.round(meters))
+                            .putString("geo_state", "UNKNOWN").putLong("geo_checked_wall", 0L).apply();
+                    GeoFenceController.register(this);
+                    FocusManager.refresh(this);
+                    render();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "Valore non valido (50 m–50 km).", Toast.LENGTH_LONG).show();
+                }
+            }).show();
+    }
+
+    private void captureGeoCenter() {
+        if (!GeoFenceController.hasForegroundPermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION}, GEO_PERMISSION_REQUEST);
+            return;
+        }
+        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (lm == null) return;
+        try {
+            String provider = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                    ? LocationManager.GPS_PROVIDER : LocationManager.NETWORK_PROVIDER;
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                lm.getCurrentLocation(provider, null, getMainExecutor(), location -> saveGeoCenter(location));
+            } else {
+                saveGeoCenter(lm.getLastKnownLocation(provider));
+            }
+        } catch (SecurityException | IllegalArgumentException e) {
+            Toast.makeText(this, "Posizione non disponibile.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void saveGeoCenter(Location location) {
+        if (location == null || !location.hasAccuracy()) {
+            Toast.makeText(this, "Nessun fix GPS/rete: attiva la posizione e riprova.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        FocusStore.setGeoCenter(this, location.getLatitude(), location.getLongitude());
+        Toast.makeText(this, "Centro memorizzato localmente · precisione ±"
+                + Math.round(location.getAccuracy()) + " m", Toast.LENGTH_LONG).show();
+        render();
+    }
+
+    private void showLocationAppSettings() {
+        new AlertDialog.Builder(this).setTitle("Accesso alla posizione in background")
+            .setMessage("Concedi 'Consenti sempre' nelle impostazioni Android per attivare le zone anche a schermo spento. Non inviamo coordinate a server.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Apri impostazioni", (d, n) -> {
+                Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(i);
+            }).show();
     }
 
     private static String pretty(int minute) {

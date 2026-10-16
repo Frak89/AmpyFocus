@@ -11,6 +11,7 @@ public final class FocusScheduler {
     private static final int START_ID = 101;
     private static final int END_ID = 102;
     private static final int MANUAL_ID = 103;
+    private static final int QUOTA_ID = 104;
     private FocusScheduler() {}
 
     public static void rearm(Context c) {
@@ -19,11 +20,15 @@ public final class FocusScheduler {
         cancel(alarm, c, START_ID);
         cancel(alarm, c, END_ID);
         cancel(alarm, c, MANUAL_ID);
+        cancel(alarm, c, QUOTA_ID);
 
         if (FocusStore.scheduleEnabled(c)
                 && FocusStore.startMinute(c) != FocusStore.endMinute(c)) {
             schedule(alarm, c, START_ID, nextTime(FocusStore.startMinute(c)));
             schedule(alarm, c, END_ID, nextTime(FocusStore.endMinute(c)));
+        }
+        if (FocusStore.prefs(c).getBoolean("quota_enabled", false)) {
+            schedule(alarm, c, QUOTA_ID, System.currentTimeMillis() + 15 * 60_000L);
         }
         long deadline = FocusManager.manualUntil(c);
         if (deadline > System.currentTimeMillis()) {
