@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Defined and granted as a signature permission by the AmpybiOS system image. -->
+    <uses-permission android:name="com.ampybios.permission.MANAGE_FOCUS" />
+</manifest>
