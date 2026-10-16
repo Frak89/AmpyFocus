@@ -452,7 +452,7 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
         update[0] = () -> {
             if (!dialog.isShowing() || leaving) return;
             dialog.setMessage("Tempo rimanente: " + remainingLabel()
-                    + "\\n\\nLa sessione terminerà soltanto se scegli Sì.");
+                    + "\n\nLa sessione terminerà soltanto se scegli Sì.");
             handler.postDelayed(update[0], 1000L);
         };
         dialog.setOnDismissListener(d -> {
