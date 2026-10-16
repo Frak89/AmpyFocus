@@ -23,8 +23,10 @@ public final class SilenceController {
                 p.edit().putInt("previous_interruption_filter", old)
                     .putBoolean("dnd_applied", true).apply();
             } else if (!active && applied) {
-                nm.setInterruptionFilter(p.getInt("previous_interruption_filter",
-                        NotificationManager.INTERRUPTION_FILTER_ALL));
+                if (nm.getCurrentInterruptionFilter() == NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
+                    nm.setInterruptionFilter(p.getInt("previous_interruption_filter",
+                            NotificationManager.INTERRUPTION_FILTER_ALL));
+                }
                 p.edit().putBoolean("dnd_applied", false).apply();
             }
         } catch (RuntimeException ignored) { }

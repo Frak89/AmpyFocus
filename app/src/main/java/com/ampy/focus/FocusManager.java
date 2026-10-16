@@ -27,6 +27,8 @@ public final class FocusManager {
     public static void endAll(Context c) {
         FocusStore.prefs(c).edit().putLong("manual_until", 0).apply();
         FocusStore.updateSchedule(c, FocusStore.startMinute(c), FocusStore.endMinute(c), false);
+        FocusStore.prefs(c).edit().putBoolean("geo_enabled", false).apply();
+        GeoFenceController.register(c);
         refresh(c);
         FocusScheduler.rearm(c);
     }
@@ -53,6 +55,9 @@ public final class FocusManager {
         Context context = c.getApplicationContext();
         SharedPreferences p = FocusStore.prefs(context);
         boolean wanted = isWanted(context);
+        boolean previousWanted = p.getBoolean("last_focus_wanted", false);
+        p.edit().putBoolean("last_focus_wanted", wanted).apply();
+        if (previousWanted && !wanted) FocusCompletionNotifier.notifyEnd(context);
         SilenceController.apply(context, wanted
                 && p.getBoolean("silence_enabled", false));
         FamilyDnsController.update(context, wanted);

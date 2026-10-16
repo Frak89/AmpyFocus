@@ -209,9 +209,17 @@ public final class MainActivity extends Activity {
         addButton(FocusStore.prefs(this).getBoolean("quota_enabled", false)
                 ? "Disattiva limite app quotidiano" : "Attiva limite app quotidiano", false,
                 () -> toggleQuota());
+        addButton("Aperture di oggi (statistiche locali)", false, () -> showLaunchMetrics());
         addButton("Minuti giornalieri per app  •  "
                 + FocusStore.prefs(this).getInt("quota_minutes", 15),
                 false, () -> configureQuota());
+        addButton(android.os.Build.VERSION.SDK_INT < 33
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                ? "Avvisi fine sessione: consentiti" : "Autorizza avviso fine Focus",
+                false, () -> {
+                    if (android.os.Build.VERSION.SDK_INT >= 33)
+                        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 506);
+                });
         addButton(UsageQuota.hasAccess(this) ? "Accesso statistiche: concesso"
                 : "Autorizza accesso alle statistiche delle app", false,
                 () -> startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)));
@@ -397,6 +405,27 @@ public final class MainActivity extends Activity {
         }
     }
 
+
+    private void showLaunchMetrics() {
+        if (!UsageQuota.hasAccess(this)) {
+            startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+            return;
+        }
+        java.util.Map<String, Integer> counts = LaunchMetrics.today(this);
+        java.util.List<FocusPackageCatalog.Entry> entries = FocusPackageCatalog.list(this);
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (FocusPackageCatalog.Entry e : entries) {
+            Integer count = counts.get(e.pkg);
+            if (count != null && count > 0) lines.add(e.label + " — " + count);
+        }
+        java.util.Collections.sort(lines);
+        new AlertDialog.Builder(this).setTitle("Aperture app di oggi")
+            .setMessage(lines.isEmpty() ? "Non sono presenti dati di avvio oggi."
+                : android.text.TextUtils.join("\\n", lines)
+                + "\\n\\nQuesti eventi sono aperture effettive, non tentativi bloccati.")
+            .setPositiveButton("Chiudi", null).show();
+    }
+
     private void toggleQuota() {
         if (!UsageQuota.hasAccess(this)) {
             new AlertDialog.Builder(this).setTitle("Permesso utilizzo app")
@@ -472,7 +501,7 @@ public final class MainActivity extends Activity {
             .setView(domains).setNegativeButton("Annulla", null)
             .setPositiveButton("Salva", (d, n) -> {
                 Set<String> normalized = DomainRules.parse(domains.getText().toString());
-                String saved = android.text.TextUtils.join("\\n", normalized);
+                String saved = android.text.TextUtils.join(", ", normalized);
                 FocusStore.prefs(this).edit().putString("custom_domains", saved).apply();
                 FocusManager.refresh(this);
                 render();
