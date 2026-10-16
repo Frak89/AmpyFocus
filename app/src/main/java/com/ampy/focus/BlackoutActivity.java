@@ -236,6 +236,13 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
 
     private void setSleeping(boolean value) {
         sleeping = value;
+        // Downshift accelerometer sampling in Sleep to reduce CPU/wakeups.
+        // SENSOR_DELAY_UI still permits deliberate shake recognition.
+        if (sensorRegistered && sensorManager != null && accelerometer != null) {
+            sensorManager.unregisterListener(this);
+            sensorRegistered = sensorManager.registerListener(this, accelerometer,
+                    sleeping ? SensorManager.SENSOR_DELAY_UI : SensorManager.SENSOR_DELAY_GAME);
+        }
         // Extra-dim is per-window and needs no special Android privilege.
         WindowManager.LayoutParams lp = getWindow().getAttributes();
         lp.screenBrightness = sleeping ? 0.01f : originalBrightness;
@@ -359,7 +366,7 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
         hideSystemBars();
         if (sensorManager != null && accelerometer != null) {
             sensorRegistered = sensorManager.registerListener(this, accelerometer,
-                    sleeping ? SensorManager.SENSOR_DELAY_NORMAL : SensorManager.SENSOR_DELAY_GAME);
+                    sleeping ? SensorManager.SENSOR_DELAY_UI : SensorManager.SENSOR_DELAY_GAME);
         }
         if (BlackoutKiosk.supported(this)) BlackoutKiosk.enter(this);
         cyberBorder.setAnimating(!sleeping);
