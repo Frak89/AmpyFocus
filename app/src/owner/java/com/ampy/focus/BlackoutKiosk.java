@@ -14,6 +14,7 @@ import java.util.Set;
 public final class BlackoutKiosk {
     private static final String OLD_ALLOWLIST = "kiosk_old_allowlist";
     private static final String MANAGED = "kiosk_managed_by_ampy";
+    private static final String OLD_FEATURES = "kiosk_old_features";
     private BlackoutKiosk() {}
 
     public static boolean supported(Context c) {
@@ -36,11 +37,18 @@ public final class BlackoutKiosk {
                 allowed.add(telecom.getDefaultDialerPackage()); // emergency dialer stays available
             }
             if (!p.getBoolean(MANAGED, false)) {
-                // Persist for cleanup after process death, time expiry, or reboot.
-                p.edit().putStringSet(OLD_ALLOWLIST, previous)
-                        .putBoolean(MANAGED, true).commit();
+                SharedPreferences.Editor editor = p.edit()
+                        .putStringSet(OLD_ALLOWLIST, previous)
+                        .putBoolean(MANAGED, true);
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    editor.putInt(OLD_FEATURES, dpm.getLockTaskFeatures(admin));
+                }
+                if (!editor.commit()) return false;
             }
             dpm.setLockTaskPackages(admin, allowed.toArray(new String[0]));
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+            }
             if (!dpm.isLockTaskPermitted(a.getPackageName())) {
                 restore(a);
                 return false;
@@ -71,7 +79,12 @@ public final class BlackoutKiosk {
             current.remove(c.getPackageName());
             current.addAll(original);
             dpm.setLockTaskPackages(admin, current.toArray(new String[0]));
-            p.edit().putBoolean(MANAGED, false).remove(OLD_ALLOWLIST).apply();
+            if (android.os.Build.VERSION.SDK_INT >= 28 && p.contains(OLD_FEATURES)) {
+                dpm.setLockTaskFeatures(admin, p.getInt(OLD_FEATURES,
+                        DevicePolicyManager.LOCK_TASK_FEATURE_NONE));
+            }
+            p.edit().putBoolean(MANAGED, false).remove(OLD_ALLOWLIST)
+                    .remove(OLD_FEATURES).commit();
         } catch (RuntimeException ignored) {
             // Keep record for next reconciliation; do not claim restored.
         }

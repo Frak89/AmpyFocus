@@ -7,6 +7,24 @@ Android 17-oriented open-source focus/digital detox system. Two APK editions fro
 | **Device Owner** | `com.ampy.focus.owner` | Android `DevicePolicyManager`: opted-in package suspension, selected metered-network restrictions, optional family DNS-over-TLS |
 | **Extreme / AmpybiOS** | `com.ampy.focus.extreme` | Contract with a **platform-signed AmpybiOS FocusBridge**. A separate AOSP source module for package suspension is included under `ampybios-integration/` |
 
+## v0.4 developer build — implemented
+
+- Blackout displays date, clock, battery, **live remaining HH:MM:SS**,
+  optional White/Brown/Pink noise buttons, and a violet/dark-blue animated
+  cyberpunk frame for **policy status/blocked app counts** (not raw system process telemetry).
+- Four alternating strong shakes play glitch+haptics and open
+  **"Sei sicuro di uscire dall'applicazione?"** with remaining time and
+  **Sì / No**; No continues, Sì ends Focus.
+- **⏻ Sleep** dims the foreground screen as far as Android permits, leaves
+  OLED pixels black except a small countdown, and shifts text occasionally.
+  It holds the display awake: this is **not** hardware Always-On Display.
+- Owner edition: optional Kiosk/Lock Task, saves/restores prior lock-task
+  packages and feature settings; in-app administrator-permission prompt
+  clearly distinguished from the separately provisioned **Device Owner** role.
+- Removed the dedicated in-app emergency call control. Android's OS emergency
+  mechanisms and an 8-second hold escape/confirmation remain available.
+- See [Blackout v0.4 guide](docs/BLACKOUT.md).
+
 ## v0.3 developer build — implemented
 
 ### Blackout — OLED-black focus surface

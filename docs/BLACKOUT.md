@@ -58,3 +58,34 @@ suspends apps, and does not control global overlays/system gestures.
   Haptic/Vibrator behavior, kiosk lifecycle, rotation, OS emergency calling,
   and time expiry while screen-off. GitHub CI checks builds and unit tests,
   not those system behaviors.
+
+## v0.4 — Shake confirmation, sound and low-brightness Sleep
+
+Normal Blackout has date, time, battery, live HH:MM:SS countdown,
+White/Pink/Brown noise buttons and a violet/navy dynamic policy/status
+border. The box shows blocked-app count / Device Owner state, not
+protected Android background processes.
+
+Four strong alternating shakes animate a short zig-zag glitch and
+haptic pattern, then open `Sei sicuro di uscire dall'applicazione?`
+with remaining duration and two buttons: **Sì / No**.
+**No** keeps the existing focus session. **Sì** ends it.
+Holding the countdown for eight seconds provides an equivalent
+confirmation if shaking does not work.
+
+The ⏻ Sleep toggle shows **only** a small timer, dimmed using
+`WindowManager.LayoutParams.screenBrightness`, with
+`FLAG_KEEP_SCREEN_ON` and occasional position shifting for OLED
+burn-in mitigation. Tap the countdown to wake. No global write-settings
+permission is needed to dim just this foreground activity; these
+pixels are not a system Always-On Display. The panel/backlight drivers
+and screen refresh still consume power.
+
+The app exposes Android's device administrator consent dialog, but
+Device Owner cannot be granted by that dialog. Device Owner must be
+provisioned through Android Enterprise/ADB on an eligible test device.
+The kiosk remains independently opt-in and previous Lock Task policy
+features/packages are restored when the app exits the kiosk.
+
+No emergency *shortcut* is shown in Blackout, but Android emergency
+calling and physical OS recovery are deliberately unaffected.

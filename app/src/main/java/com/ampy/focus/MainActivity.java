@@ -3,6 +3,8 @@ package com.ampy.focus;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -173,7 +175,6 @@ public final class MainActivity extends Activity {
                     () -> toggleNoise());
             addButton("Suono White / Pink / Brown", false, () -> chooseSound());
             addButton("Esporta WAV 24-bit / 48 kHz (60 secondi)", false, () -> chooseWavExport());
-            addButton("Chiama emergenza (112)", false, () -> callEmergency());
 
             Button finish = new Button(this);
             finish.setText("Tieni premuto per terminare il Focus");
@@ -287,6 +288,15 @@ public final class MainActivity extends Activity {
             render();
         });
 
+        addLabel("KIOSK E AUTORIZZAZIONI", 12, ACCENT, true, 28);
+        addLabel(deviceOwnerState(), 13, MUTED, false, 10);
+        addButton("Richiedi Amministratore dispositivo Android", false,
+                () -> requestDeviceAdmin());
+        addButton("Configurazione Device Owner (telefono di test)", false,
+                () -> explainOwnerProvisioning());
+        addLabel("Lock Task si attiva soltanto con Device Owner; "
+                + "l'amministratore ordinario NON concede questo ruolo.",
+                12, MUTED, false, 12);
         addLabel("STATO DEL MOTORE", 12, ACCENT, true, 28);
         addLabel(EditionPolicy.create().availabilityMessage(this), 13, MUTED, false, 12);
         addLabel("v0.2: quote app approssimative (fino a 15 min di ritardo), DNS Family opzionale; GPS/rete dipende dai permessi e dalla precisione. Extreme richiede un bridge firmato.",
@@ -302,6 +312,58 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private String deviceOwnerState() {
+        DevicePolicyManager dpm = (DevicePolicyManager)
+                getSystemService(Context.DEVICE_POLICY_SERVICE);
+        if (dpm == null) return "Gestore policy Android non disponibile";
+        if (dpm.isDeviceOwnerApp(getPackageName()))
+            return "✓ DEVICE OWNER ATTIVO · Kiosk disponibile";
+        boolean admin = dpm.isAdminActive(new ComponentName(this, FocusAdminReceiver.class));
+        return admin ? "Amministratore attivo · NON Device Owner"
+                : "Nessun ruolo Device Owner · kiosk non operativo";
+    }
+
+    private void requestDeviceAdmin() {
+        DevicePolicyManager dpm = (DevicePolicyManager)
+                getSystemService(Context.DEVICE_POLICY_SERVICE);
+        if (dpm == null) return;
+        if (dpm.isDeviceOwnerApp(getPackageName())) {
+            Toast.makeText(this, "Device Owner già configurato.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Autorizzazione amministratore")
+                .setMessage("Android può chiederti se vuoi attivare l'amministratore dispositivo. "
+                        + "Questa autorizzazione NON consente da sola il kiosk Lock Task. "
+                        + "Device Owner richiede provisioning Android Enterprise su dispositivo idoneo.")
+                .setNegativeButton("Annulla", null)
+                .setPositiveButton("Apri richiesta Android", (d, n) -> {
+                    Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+                    intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                            new ComponentName(this, FocusAdminReceiver.class));
+                    intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "L'amministratore NON concede automaticamente Device Owner.");
+                    try { startActivity(intent); }
+                    catch (RuntimeException e) {
+                        Toast.makeText(this, "Richiesta non supportata.", Toast.LENGTH_LONG).show();
+                    }
+                }).show();
+    }
+
+    private void explainOwnerProvisioning() {
+        new AlertDialog.Builder(this)
+            .setTitle("Come attivare Device Owner")
+            .setMessage("Android NON permette di concedere Device Owner tramite "
+                + "un semplice dialogo di permessi. Serve provisioning ufficiale, "
+                + "generalmente su telefono appena inizializzato, con backup. "
+                + "Su un dispositivo di test idoneo, con APK installato:\n\n"
+                + "adb shell dpm set-device-owner "
+                + getPackageName() + "/com.ampy.focus.FocusAdminReceiver\n\n"
+                + "L'operazione può fallire sui telefoni già configurati. "
+                + "Non usare il telefono principale per il primo esperimento.")
+            .setPositiveButton("Capito", null).show();
+    }
+
     private void configureBlackoutKiosk() {
         if (!BlackoutKiosk.supported(this)) {
             new AlertDialog.Builder(this).setTitle("Richiede Device Owner")
@@ -314,7 +376,7 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Kiosk Android durante Blackout")
             .setMessage("In Device Owner limita Home e altre app con Lock Task. "
                     + "Esci con una sequenza di scosse forti alternate, oppure "
-                    + "tieni premuta l'ora per 8 secondi per recupero/emergenza. "
+                    + "tieni premuto il timer per 8 secondi per lo sblocco di sicurezza. "
                     + "Non provare per la prima volta sul telefono principale.")
             .setNegativeButton("Annulla", null)
             .setPositiveButton(old ? "Disabilita" : "Abilita", (d, n) -> {
