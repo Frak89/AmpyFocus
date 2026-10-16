@@ -203,6 +203,12 @@ public final class MainActivity extends Activity {
         addLabel("RESTRIZIONI", 12, ACCENT, true, 28);
         addButton("Scegli app da bloccare (" + FocusStore.blocked(this).size() + ")",
                 false, () -> chooseBlocked());
+        addButton(FocusStore.prefs(this).getBoolean("strict_allowlist", false)
+                ? "Extreme Lockdown: SOLO ESSENZIALI" : "Extreme Lockdown: disattivato",
+                false, () -> toggleStrict());
+        addButton("Scegli le app ESSENZIALI autorizzate", false, () -> chooseEssential());
+        addButton("Apri Launcher minimalista", false,
+                () -> startActivity(new Intent(this, MinimalHomeActivity.class)));
         addButton("Launcher essenziale", false, () -> showLauncher());
         addButton("Imposta come schermata Home", false, () -> {
             try { startActivity(new Intent(Settings.ACTION_HOME_SETTINGS)); }
@@ -285,6 +291,41 @@ public final class MainActivity extends Activity {
             }).show();
     }
 
+
+    private void toggleStrict() {
+        boolean old = FocusStore.prefs(this).getBoolean("strict_allowlist", false);
+        new AlertDialog.Builder(this).setTitle("Blocco di tutte le app non essenziali")
+            .setMessage("Durante una sessione, le app avviabili non presenti nella lista ESSEnZIALI saranno sospese tramite Device Owner (o FocusBridge). Telefono, sveglia, impostazioni e servizi Android critici restano disponibili. Potrai interrompere con una pressione prolungata.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton(old ? "Disattiva" : "Attiva", (d, n) -> {
+                FocusStore.prefs(this).edit().putBoolean("strict_allowlist", !old).apply();
+                FocusManager.refresh(this);
+                render();
+            }).show();
+    }
+
+    private void chooseEssential() {
+        List<FocusPackageCatalog.Entry> apps = FocusPackageCatalog.list(this);
+        Set<String> essentials = FocusStore.prefs(this).getStringSet("essential_packages",
+                java.util.Collections.emptySet());
+        String[] names = new String[apps.size()];
+        boolean[] checked = new boolean[apps.size()];
+        for (int i = 0; i < apps.size(); i++) {
+            names[i] = apps.get(i).label + "  ·  " + apps.get(i).pkg;
+            checked[i] = essentials.contains(apps.get(i).pkg);
+        }
+        new AlertDialog.Builder(this).setTitle("App essenziali autorizzate")
+            .setMultiChoiceItems(names, checked, (d, which, value) -> checked[which] = value)
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Salva", (d, n) -> {
+                Set<String> chosen = new HashSet<>();
+                for (int i = 0; i < apps.size(); i++) if (checked[i]) chosen.add(apps.get(i).pkg);
+                FocusStore.prefs(this).edit().putStringSet("essential_packages", chosen).apply();
+                FocusManager.refresh(this);
+                render();
+            }).show();
+    }
+
     private void chooseBlocked() {
         List<FocusPackageCatalog.Entry> apps = FocusPackageCatalog.list(this);
         if (apps.isEmpty()) {
@@ -313,7 +354,7 @@ public final class MainActivity extends Activity {
 
     private void showLauncher() {
         List<FocusPackageCatalog.Entry> apps = FocusPackageCatalog.list(this);
-        Set<String> blocked = FocusStore.blocked(this);
+        Set<String> blocked = FocusManager.currentlyBlocked(this);
         boolean focus = FocusManager.isWanted(this);
         List<FocusPackageCatalog.Entry> allowed = new ArrayList<>();
         for (FocusPackageCatalog.Entry entry : apps) {
@@ -460,7 +501,10 @@ public final class MainActivity extends Activity {
         });
         int count = 0;
         for (FocusPackageCatalog.Entry entry : FocusPackageCatalog.list(this)) {
-            if (FocusStore.blocked(this).contains(entry.pkg)) continue;
+            if (FocusManager.currentlyBlocked(this).contains(entry.pkg)) continue;
+            if (FocusManager.isWanted(this)
+                    && !FocusStore.prefs(this).getStringSet("essential_packages",
+                            java.util.Collections.emptySet()).contains(entry.pkg)) continue;
             if (count++ >= 3) break;
             addButton(entry.label, false, () -> {
                 Intent launch = getPackageManager().getLaunchIntentForPackage(entry.pkg);

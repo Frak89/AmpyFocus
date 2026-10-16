@@ -9,7 +9,8 @@ Android 17-oriented open-source focus/digital detox system. Two APK editions fro
 
 ## v0.2 developer build — implemented
 
-- **Minimal OLED launcher** with standard Android HOME role, goal, focus countdown, essential Phone/Clock/app buttons, app picker and intentional hold-to-end action.
+- **Independent `MinimalHomeActivity` OLED launcher** with Android HOME role, large clock, goal, session countdown, Phone/Clock, up to 4 permitted apps and intentional hold-to-end action. The full configuration dashboard stays in `MainActivity`. Choose AmpyFocus as default Home in Android Settings.
+- **Strict allowlist mode**: during a session suspend visible launchable apps except explicitly approved essentials, protected Android components and the app itself. Use the Essential Apps picker before activating; this is opt-in, and not a blanket suspension of hidden system services.
 - Manual sessions (25/60/120 min), daily local schedules, automatic reconciliation after boot, time changes and app launch; session-completion notification.
 - **Inside/outside geographic area** focus zones, configurable **50 metres to 50 kilometres**. Uses Android GPS and NETWORK_PROVIDER (typically cell-tower/Wi-Fi-assisted location). Consent required for foreground + separately background location. Boundary decisions account for reported accuracy; stale fixes are rejected after 10 minutes. Cached coordinates never leave the device.
 - Set explicit applications to suspend under **Device Owner**, preserved locally and restored on expiry/exit where Android permits.
@@ -53,7 +54,7 @@ A regular Device Administrator **is NOT** a Device Owner. A Device Owner require
 adb shell dpm set-device-owner com.ampy.focus.owner/com.ampy.focus.FocusAdminReceiver
 ```
 
-The status UI explicitly reports unavailable privileges instead of pretending enforcement succeeded.
+The status UI explicitly reports unavailable privileges instead of pretending enforcement succeeded. For maximum lock-down, first choose essential permitted apps, select AmpyFocus as HOME, then enable Strict Allowlist. On the first run, do not use a daily-driver device.
 
 ## AmpybiOS integration
 

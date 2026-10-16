@@ -18,6 +18,8 @@
     <application
         android:allowBackup="false"
         android:label="AmpyFocus"
+        android:icon="@drawable/ic_ampyfocus"
+        android:roundIcon="@drawable/ic_ampyfocus"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">

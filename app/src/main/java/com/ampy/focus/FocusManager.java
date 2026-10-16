@@ -51,6 +51,24 @@ public final class FocusManager {
         return FocusStore.prefs(c).getString("policy_message", "");
     }
 
+
+    /** Effective app blocks: explicit deny-list plus optional strict allow-list and quotas. */
+    public static Set<String> currentlyBlocked(Context c) {
+        Set<String> packages = new HashSet<>(UsageQuota.expired(c));
+        if (isWanted(c)) {
+            packages.addAll(FocusStore.blocked(c));
+            if (FocusStore.prefs(c).getBoolean("strict_allowlist", false)) {
+                Set<String> essentials = FocusStore.prefs(c).getStringSet("essential_packages",
+                        java.util.Collections.emptySet());
+                for (FocusPackageCatalog.Entry entry : FocusPackageCatalog.list(c)) {
+                    if (!essentials.contains(entry.pkg)) packages.add(entry.pkg);
+                }
+            }
+        }
+        packages.remove(c.getPackageName());
+        return packages;
+    }
+
     public static synchronized void refresh(Context c) {
         Context context = c.getApplicationContext();
         SharedPreferences p = FocusStore.prefs(context);
@@ -62,8 +80,7 @@ public final class FocusManager {
                 && p.getBoolean("silence_enabled", false));
         FamilyDnsController.update(context, wanted);
         CellDataController.update(context, wanted);
-        Set<String> packages = new HashSet<>(UsageQuota.expired(context));
-        if (wanted) packages.addAll(FocusStore.blocked(context));
+        Set<String> packages = currentlyBlocked(context);
         boolean mustApply = wanted || !packages.isEmpty();
         FocusPolicy backend = EditionPolicy.create();
         boolean wasApplied = p.getBoolean("policy_enforced", false);
