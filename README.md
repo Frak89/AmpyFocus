@@ -11,7 +11,7 @@ Android 17-oriented open-source focus/digital detox system. Two APK editions fro
 
 ### Blackout — OLED-black focus surface
 
-- A fullscreen, pitch-black `BlackoutActivity` displays **only the date, time and battery percentage**. No app icons, navigation buttons or in-app shortcuts are visible.
+- A fullscreen, pitch-black `BlackoutActivity` displays **only the date, time and battery percentage**. No app icons, navigation buttons or in-app shortcuts are visible. See [Blackout setup and limits](docs/BLACKOUT.md).
 - Long-press any clock/date/battery indicator for a brief AmpybiOS-inspired turquoise/gold glitch, animated zig-zag text and scanlines.
 - Four deliberate alternating strong shakes within ~2 seconds trigger a zig-zag vibration and glitch, then **end Focus**. Detects with accelerometer locally, foreground-only.
 - Hold clock/date/battery for **8 seconds** to open emergency calling or end Focus if the accelerometer fails (essential recovery path). No permanent lockout.
