@@ -83,7 +83,8 @@ public final class GeoFenceController {
     }
 
     public static boolean shouldTrigger(Context c) {
-        if (!FocusStore.geoEnabled(c)) return false;
+        if (!FocusStore.geoEnabled(c) || !hasForegroundPermission(c)
+                || !hasBackgroundPermission(c)) return false;
         long checked = FocusStore.prefs(c).getLong("geo_checked_wall", 0L);
         if (checked <= 0 || Math.abs(System.currentTimeMillis() - checked) > MAX_AGE_MS) return false;
         String state = FocusStore.prefs(c).getString("geo_state", "UNKNOWN");

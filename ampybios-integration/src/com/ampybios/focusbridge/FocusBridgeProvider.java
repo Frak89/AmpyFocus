@@ -52,24 +52,24 @@ public final class FocusBridgeProvider extends ContentProvider {
             return reply(false, "Unsupported FocusBridge protocol or operation");
         }
         // Android's provider permission also restricts all exported entry points.
-        if (extras.getBoolean("family_dns") ||
+        boolean active = extras.getBoolean("active", false);
+        if (active && (extras.getBoolean("family_dns") ||
                 extras.getBoolean("metered_enabled") ||
                 (extras.getStringArrayList("blocked_domains") != null
-                    && !extras.getStringArrayList("blocked_domains").isEmpty())) {
+                    && !extras.getStringArrayList("blocked_domains").isEmpty()))) {
             return reply(false, "Firewall, custom DNS and metered data integration not installed in system image");
         }
         ArrayList<String> requested = extras.getStringArrayList("blocked_packages");
-        if (requested == null || requested.size() > 300) {
+        if (active && (requested == null || requested.size() > 300)) {
             return reply(false, "Invalid blocked packages list");
         }
         HashSet<String> desired = new HashSet<>();
-        for (String pkg : requested) {
+        for (String pkg : active ? requested : Collections.<String>emptyList()) {
             if (pkg == null || pkg.isEmpty() || isProtected(context, pkg)) {
                 return reply(false, "A protected or invalid package was selected");
             }
             desired.add(pkg);
         }
-        boolean active = extras.getBoolean("active", false);
         if (!active) desired.clear();
         try {
             synchronized (FocusBridgeProvider.class) {
