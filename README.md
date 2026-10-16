@@ -1,4 +1,4 @@
-# AmpyFocus — Minimal Launcher & Deep Work
+# AmpyFocus — Minimal Launcher, Blackout & Deep Work
 
 Android 17-oriented open-source focus/digital detox system. Two APK editions from one source repository:
 
@@ -6,6 +6,19 @@ Android 17-oriented open-source focus/digital detox system. Two APK editions fro
 | --- | --- | --- |
 | **Device Owner** | `com.ampy.focus.owner` | Android `DevicePolicyManager`: opted-in package suspension, selected metered-network restrictions, optional family DNS-over-TLS |
 | **Extreme / AmpybiOS** | `com.ampy.focus.extreme` | Contract with a **platform-signed AmpybiOS FocusBridge**. A separate AOSP source module for package suspension is included under `ampybios-integration/` |
+
+## v0.3 developer build — implemented
+
+### Blackout — OLED-black focus surface
+
+- A fullscreen, pitch-black `BlackoutActivity` displays **only the date, time and battery percentage**. No app icons, navigation buttons or in-app shortcuts are visible.
+- Long-press any clock/date/battery indicator for a brief AmpybiOS-inspired turquoise/gold glitch, animated zig-zag text and scanlines.
+- Four deliberate alternating strong shakes within ~2 seconds trigger a zig-zag vibration and glitch, then **end Focus**. Detects with accelerometer locally, foreground-only.
+- Hold clock/date/battery for **8 seconds** to open emergency calling or end Focus if the accelerometer fails (essential recovery path). No permanent lockout.
+- Optional real **Android Lock Task kiosk**, only with provisioned Device Owner and explicit consent. Restores previous kiosk policy on exit. Emergency dialer remains allowlisted.
+- On regular Android (and on a standalone Extreme debug APK), **immersive fullscreen is not a secure all-app overlay**: system gestures may still reveal Android UI.
+- One-minute preview and opt-in automatic Blackout when Focus starts; both are disabled by default except the manual preview button.
+- A genuine native AmpybiOS global overlay/system lockout still requires platform ROM implementation and device tests.
 
 ## v0.2 developer build — implemented
 

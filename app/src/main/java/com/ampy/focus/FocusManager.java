@@ -73,6 +73,7 @@ public final class FocusManager {
         Context context = c.getApplicationContext();
         SharedPreferences p = FocusStore.prefs(context);
         boolean wanted = isWanted(context);
+        if (!wanted) BlackoutKiosk.restore(context);
         boolean previousWanted = p.getBoolean("last_focus_wanted", false);
         p.edit().putBoolean("last_focus_wanted", wanted).apply();
         SilenceController.apply(context, wanted

@@ -82,6 +82,10 @@ public final class MainActivity extends Activity {
         FocusScheduler.rearm(this);
         noisePlaying = BrownNoiseService.isPlaying;
         render();
+        if (FocusManager.isWanted(this) && FocusStore.prefs(this)
+                .getBoolean("blackout_auto_enabled", false)) {
+            startActivity(new Intent(this, BlackoutActivity.class));
+        }
         handler.removeCallbacks(ticker);
         handler.post(ticker);
     }
@@ -148,6 +152,8 @@ public final class MainActivity extends Activity {
         boolean wanted = FocusManager.isWanted(this);
         boolean enforced = FocusManager.isEnforced(this);
         if (wanted) {
+            addButton("⬛ SCHERMO NERO • ZERO DISTRAZIONI", true,
+                    () -> startActivity(new Intent(this, BlackoutActivity.class)));
             addLabel(enforced ? "● FOCUS ATTIVO" : "○ BLOCCO NON OPERATIVO",
                     13, enforced ? ACCENT : Color.rgb(252, 177, 105), true, 44);
             countdown = label("00:00:00", 48, TEXT, true);
@@ -199,6 +205,21 @@ public final class MainActivity extends Activity {
         addButton("Focus • 25 minuti", true, () -> start(25));
         addButton("Focus • 60 minuti", false, () -> start(60));
         addButton("Focus • 120 minuti", false, () -> start(120));
+        addLabel("SCHERMO NERO AMPYBIOS", 12, ACCENT, true, 28);
+        addButton("Blackout di prova • 1 minuto", true, () -> {
+            FocusManager.startManual(this, 1);
+            startActivity(new Intent(this, BlackoutActivity.class));
+        });
+        addButton(FocusStore.prefs(this).getBoolean("blackout_auto_enabled", false)
+                ? "Blackout automatico: SÌ" : "Blackout automatico: NO", false, () -> {
+            boolean old = FocusStore.prefs(this)
+                    .getBoolean("blackout_auto_enabled", false);
+            FocusStore.prefs(this).edit().putBoolean("blackout_auto_enabled", !old).apply();
+            render();
+        });
+        addButton(FocusStore.prefs(this).getBoolean("blackout_kiosk_enabled", false)
+                ? "Kiosk Device Owner: ATTIVO" : "Kiosk Device Owner: NON ATTIVO",
+                false, () -> configureBlackoutKiosk());
 
         addLabel("RESTRIZIONI", 12, ACCENT, true, 28);
         addButton("Scegli app da bloccare (" + FocusStore.blocked(this).size() + ")",
@@ -274,7 +295,32 @@ public final class MainActivity extends Activity {
 
     private void start(int minutes) {
         FocusManager.startManual(this, minutes);
-        render();
+        if (FocusStore.prefs(this).getBoolean("blackout_auto_enabled", false)) {
+            startActivity(new Intent(this, BlackoutActivity.class));
+        } else {
+            render();
+        }
+    }
+
+    private void configureBlackoutKiosk() {
+        if (!BlackoutKiosk.supported(this)) {
+            new AlertDialog.Builder(this).setTitle("Richiede Device Owner")
+                .setMessage("Il kiosk ufficiale richiede Android Device Owner su un dispositivo di prova. "
+                        + "Senza tale privilegio i gesti Android possono uscire dal fullscreen.")
+                .setPositiveButton("Capito", null).show();
+            return;
+        }
+        boolean old = FocusStore.prefs(this).getBoolean("blackout_kiosk_enabled", false);
+        new AlertDialog.Builder(this).setTitle("Kiosk Android durante Blackout")
+            .setMessage("In Device Owner limita Home e altre app con Lock Task. "
+                    + "Esci con una sequenza di scosse forti alternate, oppure "
+                    + "tieni premuta l'ora per 8 secondi per recupero/emergenza. "
+                    + "Non provare per la prima volta sul telefono principale.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton(old ? "Disabilita" : "Abilita", (d, n) -> {
+                FocusStore.prefs(this).edit().putBoolean("blackout_kiosk_enabled", !old).apply();
+                render();
+            }).show();
     }
 
     private void editGoal() {

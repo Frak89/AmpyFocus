@@ -76,6 +76,10 @@ public final class MinimalHomeActivity extends Activity {
         FocusManager.refresh(this);
         FocusScheduler.rearm(this);
         showHome();
+        if (FocusManager.isWanted(this) && FocusStore.prefs(this)
+                .getBoolean("blackout_auto_enabled", false)) {
+            startActivity(new Intent(this, BlackoutActivity.class));
+        }
         handler.removeCallbacks(update);
         handler.post(update);
     }
