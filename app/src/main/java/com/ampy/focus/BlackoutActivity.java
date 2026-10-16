@@ -319,7 +319,7 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
                 if (level >= 0 && scale > 0) value = Math.round(level * 100f / scale);
             }
             battery.setText(value >= 0 ? "▰ " + value + "%" : "▰ --%");
-            processSummary.setText("POLICY: " + (FocusManager.isEnforced(this) ? "ATTIVA" : "NON OPERATIVA")
+            processSummary.setText("PROCESSI / POLICY: " + (FocusManager.isEnforced(this) ? "ATTIVA" : "NON OPERATIVA")
                     + "   •   APP LIMITATE: " + FocusManager.currentlyBlocked(this).size()
                     + "   •   " + (BlackoutKiosk.supported(this) ? "DPC" : "NO DPC"));
             lastBatteryMinute = minute;
@@ -437,12 +437,9 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
     private void showExitConfirmation() {
         if (leaving || waitingForAnswer) return;
         waitingForAnswer = true;
-        String left = remainingLabel();
-        String message = "Tempo rimanente: " + left
-                + "\n\nLa sessione terminerà soltanto se scegli Sì.";
         final AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Sei sicuro di uscire dall'applicazione?")
-                .setMessage(message)
+                .setMessage("")
                 .setNegativeButton("No", (d, which) -> waitingForAnswer = false)
                 .setPositiveButton("Sì", (d, which) -> {
                     leaving = true;
@@ -450,9 +447,20 @@ public final class BlackoutActivity extends Activity implements SensorEventListe
                     BlackoutKiosk.exit(this);
                     finish();
                 })
-                .setOnCancelListener(d -> waitingForAnswer = false)
                 .create();
+        final Runnable[] update = new Runnable[1];
+        update[0] = () -> {
+            if (!dialog.isShowing() || leaving) return;
+            dialog.setMessage("Tempo rimanente: " + remainingLabel()
+                    + "\\n\\nLa sessione terminerà soltanto se scegli Sì.");
+            handler.postDelayed(update[0], 1000L);
+        };
+        dialog.setOnDismissListener(d -> {
+            waitingForAnswer = false;
+            handler.removeCallbacks(update[0]);
+        });
         dialog.show();
+        handler.post(update[0]);
     }
 
     private void finishWithoutEnding() {
