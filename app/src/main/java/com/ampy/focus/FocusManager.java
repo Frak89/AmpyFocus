@@ -75,9 +75,9 @@ public final class FocusManager {
         boolean wanted = isWanted(context);
         boolean previousWanted = p.getBoolean("last_focus_wanted", false);
         p.edit().putBoolean("last_focus_wanted", wanted).apply();
-        if (previousWanted && !wanted) FocusCompletionNotifier.notifyEnd(context);
         SilenceController.apply(context, wanted
                 && p.getBoolean("silence_enabled", false));
+        if (previousWanted && !wanted) FocusCompletionNotifier.notifyEnd(context);
         FamilyDnsController.update(context, wanted);
         CellDataController.update(context, wanted);
         Set<String> packages = currentlyBlocked(context);

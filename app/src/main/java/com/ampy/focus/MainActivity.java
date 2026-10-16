@@ -500,11 +500,13 @@ public final class MainActivity extends Activity {
             }
         });
         int count = 0;
+        Set<String> blocked = FocusManager.currentlyBlocked(this);
+        boolean inFocus = FocusManager.isWanted(this);
+        Set<String> essentials = FocusStore.prefs(this).getStringSet("essential_packages",
+                java.util.Collections.emptySet());
         for (FocusPackageCatalog.Entry entry : FocusPackageCatalog.list(this)) {
-            if (FocusManager.currentlyBlocked(this).contains(entry.pkg)) continue;
-            if (FocusManager.isWanted(this)
-                    && !FocusStore.prefs(this).getStringSet("essential_packages",
-                            java.util.Collections.emptySet()).contains(entry.pkg)) continue;
+            if (blocked.contains(entry.pkg)) continue;
+            if (inFocus && !essentials.contains(entry.pkg)) continue;
             if (count++ >= 3) break;
             addButton(entry.label, false, () -> {
                 Intent launch = getPackageManager().getLaunchIntentForPackage(entry.pkg);
