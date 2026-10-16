@@ -54,4 +54,4 @@ The Extreme APK needs a **real privileged component in an AmpybiOS system image*
 
 Local-only preferences; no analytics SDK, network permission, or tracking. No AccessibilityService or VPN is requested in the preview. Re-evaluate disclosures, provisioning limitations, signatures, website-filtering reliability and store policies **before public distribution**.
 
-Licensed under Apache-2.0. Contributions welcome.
+Licensed under the MIT License. Contributions welcome.

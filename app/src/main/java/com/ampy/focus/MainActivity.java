@@ -41,7 +41,7 @@ public final class MainActivity extends Activity {
         @Override public void run() {
             if (countdown != null) {
                 long remaining = FocusManager.expectedEndMillis(MainActivity.this) - System.currentTimeMillis();
-                if (remaining <= 0 && FocusManager.isWanted(MainActivity.this)) {
+                if (remaining <= 0) {
                     FocusManager.refresh(MainActivity.this);
                     FocusScheduler.rearm(MainActivity.this);
                     render();
@@ -66,6 +66,7 @@ public final class MainActivity extends Activity {
         super.onResume();
         FocusManager.refresh(this);
         FocusScheduler.rearm(this);
+        noisePlaying = BrownNoiseService.isPlaying;
         render();
         handler.removeCallbacks(ticker);
         handler.post(ticker);

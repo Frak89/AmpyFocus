@@ -15,6 +15,7 @@ import java.util.Random;
 /** Locally synthesized, nonlooping noise; plays as a user-started media FGS. */
 public final class BrownNoiseService extends Service {
     private static final String CHANNEL = "ampyfocus_audio";
+    public static volatile boolean isPlaying;
     private volatile boolean running;
     private Thread audioThread;
 
@@ -38,6 +39,7 @@ public final class BrownNoiseService extends Service {
         startForeground(210, notification);
         if (!running) {
             running = true;
+            isPlaying = true;
             audioThread = new Thread(this::playLoop, "AmpyFocus-BrownNoise");
             audioThread.start();
         }
@@ -83,12 +85,14 @@ public final class BrownNoiseService extends Service {
                 track.release();
             }
             running = false;
+            isPlaying = false;
         }
     }
 
     @Override
     public void onDestroy() {
         running = false;
+        isPlaying = false;
         if (audioThread != null) audioThread.interrupt();
         super.onDestroy();
     }
